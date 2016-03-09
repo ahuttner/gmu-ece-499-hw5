@@ -1,93 +1,62 @@
-from picamera.array import PiRGBArray
-from picamera import PiCamera 
-import picamera 
-import time 
-import cv2 
-import numpy as np 
-import io 
-import sys 
+import time
+import cv2
+import numpy as np
+import io
+import sys
 import os
 
-
-color = sys.argv[1]
-print "Chosen color is: ", color
-
-BlueL = np.array([100,50,50])
-BlueH = np.array([140,255,255])
-RedL = np.array([0,50,50])
-RedH = np.array([20,255,255])
-GreenL = np.array([40,100,50])
-GreenH = np.array([80,255,255])
-
-Low = ([0,0,0])
-High = ([255,255,255])
-
-if color == 'r' or color ==  'R':
-	Low = RedL
-	High = RedH
-elif color  == 'g' or color == 'G':
-	Low = GreenL
-	High = GreenH
-elif color == 'b' or color == 'B':
-	Low = BlueL
-	High = BlueH
-
-cam = PiCamera()
-
-cam.vflip = True
-cam.hflip = True
-
-cam.resolution = (320,240)
-
 try:
-	while True:
-		cap = PiRGBArray(cam)
+        color = sys.argv[1]
+        print "Chosen color is: ", color
 
-		cam.capture(cap,format="bgr")
+        BlueL = np.array([100,50,50],np.uint8)
+        BlueH = np.array([140,255,255],np.uint8)
+        RedL = np.array([0,50,50],np.uint8)
+        RedH = np.array([20,255,255],np.uint8)
+        GreenL = np.array([40,50,50],np.uint8)
+        GreenH = np.array([80,255,255],np.uint8)
 
-		im = cap.array
-		imHSV = cv2.cvtColor(im,cv2.COLOR_BGR2HSV)
-		imRang = cv2.inRange(imHSV,Low,High)
-#		print imRang
-#		cv2.imshow("Range",imRang)
-		cv2.waitKey(5)
-		
-		if color == 'R' or color == 'r':
-			if np.mean(imRang) > 10:
-				#Centering
-				NonZ = np.nonzero(imRang)
-				#Find center of mass
-				moment = cv2.moments(imRang) #Imrang exchanged for NonZ
-				center =int(moment['m10']/moment['m00'])
-				print "Center X is: ",center
-				if center == 160:
-					os.system("python SendWheel.py "+'s')
-				elif center < 160:
-					os.system("python SendWheel.py "+'a')
-				else:
-					os.system("python SendWheel.py "+'s')
-				print "It's gettin hot in hurr"
-			else:
-				 os.system("python SendWheel.py "+'a')
-		#If it is onscreen, center it	
-		elif np.mean(imRang) > 5:
-			#Centering
-			NonZ = np.nonzero(imRang)
-			moment = cv2.moments(imRang) #imRang exchanged for NonZ
-			center = int(moment['m10']/moment['m00'])
-			print "Center X is: ",center
-			if center == 160:
-				os.system("python SendWheel.py "+'s')
-			elif center < 160:
-				os.system("python SendWheel.py "+'a')
-			else:
-				os.system("python SendWheel.py "+'s')
-			print "Fuck Yeah, it be hurr"
-		#If not there pivot to look for it
-		else:
-			os.system("python SendWheel.py " +'d')
+        Low = ([0,0,0])
+        High = ([255,255,255])
 
-	
-except KeyboardInterrupt:		
-	os.system("python SendWheel.py "+'s')
+        if color == 'r' or color ==  'R':
+                Low = RedL
+                High = RedH
+        elif color  == 'g' or color == 'G':
+                Low = GreenL
+                High = GreenH
+        elif color == 'b' or color == 'B':
+                Low = BlueL
+                High = BlueH
 
+        cap = cv2.VideoCapture(0)
+
+        while True:
+                ret, frame = cap.read()
+                hsv = cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
+                mask = cv2.inRange(hsv,Low,High)
+                M = cv2.moments(mask)
+                if M['m00'] == 0:
+                        print "cx and cy will both be 0"
+                        cx = 0
+                        cy = 0
+                else:
+                        cx = int(M['m10']/M['m00'])
+                        cy = int(M['m01']/M['m00'])
+                cv2.imshow('Mask',mask)
+                cv2.waitKey(5)
+                if cx > 300 and cx < 340:
+                        print "Centered"
+                        os.system("python send_wheel.py " + 's')
+                elif cx < 300 and cx > 0:
+                        print "Object to left, move left"
+                        os.system("python send_wheel.py " + 'a')
+                elif cx > 340:
+                        print "Object to right, move right"
+                        os.system("python send_wheel.py " + 'd')
+                else:
+                        print "Stop"
+                        os.system("python send_wheel.py " + 's')
+
+except KeyboardInterrupt:
+        os.system("python send_wheel.py "+'s')
